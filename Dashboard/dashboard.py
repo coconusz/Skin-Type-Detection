@@ -86,7 +86,7 @@ class VideoTransformer(VideoTransformerBase):
         return img
 
 def take_photo():
-    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer, media_stream_constraints={"video": True, "audio": False})
+    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
     st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
     
     if st.button('📸 Ambil Foto'):
@@ -119,5 +119,7 @@ def take_photo():
                 st.write(f"Jenis Kulit yang Terdeteksi: {predicted_skin_type}")
                 st.write(skin_type_descriptions[predicted_skin_type])
                 st.write(skin_type_care[predicted_skin_type])
+        else:
+            st.write("Gambar belum diambil atau tidak ditemukan.")
 
 take_photo()
