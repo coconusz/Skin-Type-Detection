@@ -86,7 +86,7 @@ class VideoTransformer(VideoTransformerBase):
         return img
 
 def take_photo():
-    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
+    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer, media_stream_constraints={"video": True, "audio": False})
     st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
     
     if st.button('📸 Ambil Foto'):
