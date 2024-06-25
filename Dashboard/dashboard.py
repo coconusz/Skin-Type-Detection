@@ -31,7 +31,7 @@ class CustomResNet(nn.Module):
 
 model = CustomResNet(num_classes=4)
 try:
-    model.load_state_dict(torch.load('C:\\Documents\\COLLEGE\\PI\\Implementasi Algoritma Convolutional Neural Network (CNN) Untuk Sistem Identifikasi Jenis Kulit Wajah\\Dashboard\\skintypes-model.pth', map_location=torch.device('cpu')), strict=False)
+    model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')), strict=False)
     model.eval()
 except RuntimeError as e:
     st.error(f"Error loading the model: {e}")
