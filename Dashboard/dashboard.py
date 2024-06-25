@@ -6,7 +6,7 @@ import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
 import av
 
 mtcnn = MTCNN()
@@ -86,7 +86,16 @@ class VideoTransformer(VideoTransformerBase):
         return img
 
 def take_photo():
-    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
+    webrtc_ctx = webrtc_streamer(
+        key="example",
+        video_transformer_factory=VideoTransformer,
+        media_stream_constraints={"video": True, "audio": False},
+        client_settings=ClientSettings(
+            rtc_configuration={
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            }
+        )
+    )
     st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
     
     if st.button('📸 Ambil Foto'):
