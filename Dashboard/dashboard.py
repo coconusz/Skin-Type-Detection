@@ -6,9 +6,13 @@ import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
+import av
 
+# Initialize MTCNN for face detection
 mtcnn = MTCNN()
 
+# Define the CustomResNet model
 class CustomResNet(nn.Module):
     def __init__(self, num_classes=4):
         super(CustomResNet, self).__init__()
@@ -27,6 +31,7 @@ class CustomResNet(nn.Module):
     def forward(self, x):
         return self.model(x)
 
+# Load the pre-trained model
 model = CustomResNet(num_classes=4)
 try:
     model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')), strict=False)
@@ -34,12 +39,14 @@ try:
 except RuntimeError as e:
     st.error(f"Error loading the model: {e}")
 
+# Define the image transformation
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
+# Skin types and their descriptions
 skin_types = ["Berminyak", "Kering", "Normal", "Kombinasi"]
 skin_type_descriptions = {
     "Berminyak": "Kulitmu terdeteksi berminyak. Tipe kulit yang berminyak cenderung terlihat mengkilap dan licin akibat produksi minyak atau sebum berlebih pada wajah.",
@@ -54,11 +61,13 @@ skin_type_care = {
     "Kombinasi": "Saran Perawatan: Bersihkan wajah 2 kali sehari secara rutin. Hindari penggunaan produk pembersih yang mengandung alkohol, asam salisilat, dan benzoil peroksida. Selain itu, kamu juga bisa menggunakan produk pembersih untuk kulit wajah kering di area pipi dan produk khusus kulit berminyak untuk area T-zone."
 }
 
+# Preprocess the image
 def preprocess_image(image):
     image = transform(image)
     image = image.unsqueeze(0)
     return image
 
+# Classify the image using the model
 def classify_image(image):
     with torch.no_grad():
         output = model(image)
@@ -66,82 +75,67 @@ def classify_image(image):
         predicted_skin_type = skin_types[predicted.item()]
     return predicted_skin_type
 
+# Detect faces in the image
 def detect_faces(image):
     boxes, _ = mtcnn.detect(image)
     return boxes
 
+# Streamlit app
 st.set_option('deprecation.showfileUploaderEncoding', False)
 st.title("✨Skin Type Detection✨")
 st.write("Kenali Tipe Wajahmu dengan Kamera!")
 
-choice = st.sidebar.selectbox("Pilih Mode Input", ["Gambar", "Kamera"])
+# VideoTransformer for webcam input
+class VideoTransformer(VideoTransformerBase):
+    def __init__(self):
+        self.result_img = None
 
-if choice == "Kamera":
-    st.markdown('<p class="header-font">Kamera</p>', unsafe_allow_html=True)
-    st.markdown('<p class="description-font">Hanya dapat diakses atau digunakan dengan kamera webcam (desktop).</p>', unsafe_allow_html=True)
-    img_file_buffer = st.camera_input("Take a picture")
-    if img_file_buffer is not None:
-        # To read image file buffer with PIL:
-        img_pil = Image.open(img_file_buffer)
-        
-        # Process the image
-        img_rgb = np.array(img_pil)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-        
-        if len(faces) == 0:
-            st.write("Wajah tidak terdeteksi! Silahkan ambil gambar kembali.")
-        else:
-            x, y, w, h = faces[0]
-            face_image = img_rgb[y:y+h, x:x+w]
-            face_image_pil = Image.fromarray(face_image)
-            
-            processed_image = preprocess_image(face_image_pil)
-            prediction = classify_image(processed_image)
-            
-            # Display the prediction
-            st.write(f"Jenis Kulit yang Terdeteksi: {prediction}")
-            st.write(skin_type_descriptions[prediction])
-            st.write(skin_type_care[prediction])
-            
-            # Display the image with the prediction text
-            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(img_bgr, prediction, (50, 50), font, 1, (255, 0, 0), 2, cv2.LINE_AA)
-            st.image(img_bgr, channels="BGR")
+    def transform(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        self.result_img = img
+        return img
 
-elif choice == "Gambar":
-    st.markdown('<p class="header-font">Gambar</p>', unsafe_allow_html=True)
-    st.markdown('<p class="description-font">Unggah gambar dari komputer.</p>', unsafe_allow_html=True)
-    img_file_buffer = st.file_uploader("Unggah Gambar", type=["jpg", "jpeg", "png"])
-    if img_file_buffer is not None:
-        # To read image file buffer with PIL:
-        img_pil = Image.open(img_file_buffer)
+def take_photo():
+    webrtc_ctx = webrtc_streamer(
+        key="example",
+        video_transformer_factory=VideoTransformer,
+        media_stream_constraints={"video": True, "audio": False},
+        client_settings=ClientSettings(
+            rtc_configuration={
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            }
+        )
+    )
+    st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
+    
+    if st.button('📸 Ambil Foto'):
+        if webrtc_ctx.video_transformer and webrtc_ctx.video_transformer.result_img is not None:
+            captured_img = webrtc_ctx.video_transformer.result_img
+            st.image(captured_img, use_column_width=True)
+            st.write("")
+            st.write("Processing...")
+
+            captured_img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
+            face_image_pil = Image.fromarray(captured_img_rgb)
         
-        # Process the image
-        img_rgb = np.array(img_pil)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-        
-        if len(faces) == 0:
-            st.write("Wajah tidak terdeteksi! Silahkan unggah gambar lain.")
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            gray = cv2.cvtColor(captured_img, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    
+            if len(faces) == 0:
+                st.write("Wajah tidak terdeteksi! Silahkan ambil gambar kembali.")
+            else:
+                x, y, w, h = faces[0]
+                face_image = captured_img[y:y+h, x:x+w]
+                face_image_pil = Image.fromarray(cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB))
+
+                processed_image = preprocess_image(face_image_pil)
+                predicted_skin_type = classify_image(processed_image)
+
+                st.write(f"Jenis Kulit yang Terdeteksi: {predicted_skin_type}")
+                st.write(skin_type_descriptions[predicted_skin_type])
+                st.write(skin_type_care[predicted_skin_type])
         else:
-            x, y, w, h = faces[0]
-            face_image = img_rgb[y:y+h, x:x+w]
-            face_image_pil = Image.fromarray(face_image)
-            
-            processed_image = preprocess_image(face_image_pil)
-            prediction = classify_image(processed_image)
-            
-            # Display the prediction
-            st.write(f"Jenis Kulit yang Terdeteksi: {prediction}")
-            st.write(skin_type_descriptions[prediction])
-            st.write(skin_type_care[prediction])
-            
-            # Display the image with the prediction text
-            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(img_bgr, prediction, (50, 50), font, 1, (255, 0, 0), 2, cv2.LINE_AA)
-            st.image(img_bgr, channels="BGR")
+            st.write("Gambar belum diambil atau tidak ditemukan.")
+
+take_photo()
