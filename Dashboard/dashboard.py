@@ -6,12 +6,8 @@ from torchvision import transforms, models
 from PIL import Image
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
 import av
-
-try:
-    import cv2
-except ImportError as e:
-    st.error(f"Error importing OpenCV: {e}")
-    st.stop()
+import cv2
+import os
 
 mtcnn = MTCNN()
 
@@ -34,11 +30,16 @@ class CustomResNet(nn.Module):
         return self.model(x)
 
 model = CustomResNet(num_classes=4)
-try:
-    model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')), strict=False)
-    model.eval()
-except RuntimeError as e:
-    st.error(f"Error loading the model: {e}")
+
+model_path = 'Dashboard/skintypes-model.pth'
+if os.path.exists(model_path):
+    try:
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')), strict=False)
+        model.eval()
+    except (EOFError, RuntimeError) as e:
+        st.error(f"Error loading the model: {e}")
+else:
+    st.error(f"Model file not found at {model_path}")
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
