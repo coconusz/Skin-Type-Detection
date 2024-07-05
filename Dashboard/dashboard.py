@@ -74,55 +74,74 @@ st.set_option('deprecation.showfileUploaderEncoding', False)
 st.title("✨Skin Type Detection✨")
 st.write("Kenali Tipe Wajahmu dengan Kamera!")
 
-def main():
-    cap = cv2.VideoCapture(0)
-    st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
-    
-    stframe = st.empty()
-    
-    if st.button('📸 Ambil Foto'):
-        ret, frame = cap.read()
-        if ret:
-            cap.release()
-            stframe.image(frame, channels="BGR", use_column_width=True)
-            st.write("Processing...")
+choice = st.sidebar.selectbox("Pilih Mode Input", ["Gambar", "Kamera"])
 
-            captured_img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            face_image_pil = Image.fromarray(captured_img_rgb)
+if choice == "Kamera":
+    st.markdown('<p class="header-font">Kamera</p>', unsafe_allow_html=True)
+    st.markdown('<p class="description-font">Hanya dapat diakses atau digunakan dengan kamera webcam (desktop).</p>', unsafe_allow_html=True)
+    img_file_buffer = st.camera_input("Take a picture")
+    if img_file_buffer is not None:
+        # To read image file buffer with PIL:
+        img_pil = Image.open(img_file_buffer)
         
-            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    
-            if len(faces) == 0:
-                st.write("Wajah tidak terdeteksi! Silahkan ambil gambar kembali.")
-            else:
-                x, y, w, h = faces[0]
-                face_image = frame[y:y+h, x:x+w]
-                face_image_pil = Image.fromarray(cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB))
-
-                processed_image = preprocess_image(face_image_pil)
-                with torch.no_grad():
-                    output = model(processed_image)
-                    _, predicted = torch.max(output, 1)
-                    predicted_skin_type = skin_types[predicted.item()]
-
-                st.write(f"Jenis Kulit yang Terdeteksi: {predicted_skin_type}")
-                st.write(skin_type_descriptions[predicted_skin_type])
-                st.write(skin_type_care[predicted_skin_type])
+        # Process the image
+        img_rgb = np.array(img_pil)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        if len(faces) == 0:
+            st.write("Wajah tidak terdeteksi! Silahkan ambil gambar kembali.")
         else:
-            st.write("Gambar belum diambil atau tidak ditemukan.")
+            x, y, w, h = faces[0]
+            face_image = img_rgb[y:y+h, x:x+w]
+            face_image_pil = Image.fromarray(face_image)
+            
+            processed_image = preprocess_image(face_image_pil)
+            prediction = classify_image(processed_image)
+            
+            # Display the prediction
+            st.write(f"Jenis Kulit yang Terdeteksi: {prediction}")
+            st.write(skin_type_descriptions[prediction])
+            st.write(skin_type_care[prediction])
+            
+            # Display the image with the prediction text
+            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(img_bgr, prediction, (50, 50), font, 1, (255, 0, 0), 2, cv2.LINE_AA)
+            st.image(img_bgr, channels="BGR")
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        stframe.image(frame, channels="BGR", use_column_width=True)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    main()
+elif choice == "Gambar":
+    st.markdown('<p class="header-font">Gambar</p>', unsafe_allow_html=True)
+    st.markdown('<p class="description-font">Unggah gambar dari komputer.</p>', unsafe_allow_html=True)
+    img_file_buffer = st.file_uploader("Unggah Gambar", type=["jpg", "jpeg", "png"])
+    if img_file_buffer is not None:
+        # To read image file buffer with PIL:
+        img_pil = Image.open(img_file_buffer)
+        
+        # Process the image
+        img_rgb = np.array(img_pil)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        if len(faces) == 0:
+            st.write("Wajah tidak terdeteksi! Silahkan unggah gambar lain.")
+        else:
+            x, y, w, h = faces[0]
+            face_image = img_rgb[y:y+h, x:x+w]
+            face_image_pil = Image.fromarray(face_image)
+            
+            processed_image = preprocess_image(face_image_pil)
+            prediction = classify_image(processed_image)
+            
+            # Display the prediction
+            st.write(f"Jenis Kulit yang Terdeteksi: {prediction}")
+            st.write(skin_type_descriptions[prediction])
+            st.write(skin_type_care[prediction])
+            
+            # Display the image with the prediction text
+            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(img_bgr, prediction, (50, 50), font, 1, (255, 0, 0), 2, cv2.LINE_AA)
+            st.image(img_bgr, channels="BGR")
