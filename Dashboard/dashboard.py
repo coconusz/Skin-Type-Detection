@@ -1,7 +1,42 @@
+import subprocess
+import sys
+
+# Function to install packages
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# Check and install required packages
+try:
+    import cv2
+except ImportError:
+    install('opencv-python-headless')
+    import cv2
+
+try:
+    import torch
+except ImportError:
+    install('torch')
+    import torch
+
+try:
+    import torchvision
+except ImportError:
+    install('torchvision')
+    import torchvision
+
+try:
+    import facenet_pytorch
+except ImportError:
+    install('facenet-pytorch')
+    import facenet_pytorch
+
+try:
+    import streamlit_webrtc
+except ImportError:
+    install('streamlit-webrtc')
+    import streamlit_webrtc
+
 import streamlit as st
-import cv2
-import numpy as np
-import torch
 import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
