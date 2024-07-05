@@ -1,6 +1,4 @@
 import streamlit as st
-import cv2
-import numpy as np
 import torch
 import torch.nn as nn
 from facenet_pytorch import MTCNN
@@ -8,6 +6,12 @@ from torchvision import transforms, models
 from PIL import Image
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
 import av
+
+try:
+    import cv2
+except ImportError as e:
+    st.error(f"Error importing OpenCV: {e}")
+    st.stop()
 
 mtcnn = MTCNN()
 
