@@ -1,48 +1,10 @@
-import subprocess
-import sys
-
-# Function to install packages
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-# Check and install required packages
-try:
-    import cv2
-except ImportError:
-    install('opencv-python-headless')
-    import cv2
-
-try:
-    import torch
-except ImportError:
-    install('torch')
-    import torch
-
-try:
-    import torchvision
-except ImportError:
-    install('torchvision')
-    import torchvision
-
-try:
-    import facenet_pytorch
-except ImportError:
-    install('facenet-pytorch')
-    import facenet_pytorch
-
-try:
-    import streamlit_webrtc
-except ImportError:
-    install('streamlit-webrtc')
-    import streamlit_webrtc
-
 import streamlit as st
+import torch
 import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
-import av
+import cv2
 
 # Initialize MTCNN for face detection
 mtcnn = MTCNN()
@@ -68,11 +30,8 @@ class CustomResNet(nn.Module):
 
 # Load the pre-trained model
 model = CustomResNet(num_classes=4)
-try:
-    model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')), strict=False)
-    model.eval()
-except RuntimeError as e:
-    st.error(f"Error loading the model: {e}")
+model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')))
+model.eval()
 
 # Define the image transformation
 transform = transforms.Compose([
@@ -110,67 +69,36 @@ def classify_image(image):
         predicted_skin_type = skin_types[predicted.item()]
     return predicted_skin_type
 
-# Detect faces in the image
-def detect_faces(image):
-    boxes, _ = mtcnn.detect(image)
-    return boxes
-
 # Streamlit app
-st.set_option('deprecation.showfileUploaderEncoding', False)
 st.title("✨Skin Type Detection✨")
-st.write("Kenali Tipe Wajahmu dengan Kamera!")
+st.write("Kenali Tipe Wajahmu!")
 
-# VideoTransformer for webcam input
-class VideoTransformer(VideoTransformerBase):
-    def __init__(self):
-        self.result_img = None
+# Function to process camera input
+def process_camera_input():
+    video_stream = st.camera_input()
+    while video_stream.is_active:
+        frame = video_stream.read()
+        if frame is not None:
+            # Convert frame to PIL Image
+            frame_pil = Image.fromarray(frame)
 
-    def transform(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        self.result_img = img
-        return img
+            # Detect faces
+            boxes, _ = mtcnn.detect(frame_pil)
 
-def take_photo():
-    webrtc_ctx = webrtc_streamer(
-        key="example",
-        video_transformer_factory=VideoTransformer,
-        media_stream_constraints={"video": True, "audio": False},
-        client_settings=ClientSettings(
-            rtc_configuration={
-                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            }
-        )
-    )
-    st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
-    
-    if st.button('📸 Ambil Foto'):
-        if webrtc_ctx.video_transformer and webrtc_ctx.video_transformer.result_img is not None:
-            captured_img = webrtc_ctx.video_transformer.result_img
-            st.image(captured_img, use_column_width=True)
-            st.write("")
-            st.write("Processing...")
+            # Display only the face if detected
+            if boxes is not None:
+                for box in boxes:
+                    x, y, w, h = [int(coord) for coord in box]
+                    face_image = frame[y:y+h, x:x+w]
+                    face_image_pil = Image.fromarray(face_image)
+                    
+                    # Preprocess and classify the face image
+                    processed_image = preprocess_image(face_image_pil)
+                    predicted_skin_type = classify_image(processed_image)
 
-            captured_img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
-            face_image_pil = Image.fromarray(captured_img_rgb)
-        
-            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            gray = cv2.cvtColor(captured_img, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    
-            if len(faces) == 0:
-                st.write("Wajah tidak terdeteksi! Silahkan ambil gambar kembali.")
-            else:
-                x, y, w, h = faces[0]
-                face_image = captured_img[y:y+h, x:x+w]
-                face_image_pil = Image.fromarray(cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB))
+                    # Display results
+                    st.image(face_image, caption=f"Jenis Kulit: {predicted_skin_type}", use_column_width=True)
+                    st.write(skin_type_descriptions[predicted_skin_type])
+                    st.write(skin_type_care[predicted_skin_type])  
 
-                processed_image = preprocess_image(face_image_pil)
-                predicted_skin_type = classify_image(processed_image)
-
-                st.write(f"Jenis Kulit yang Terdeteksi: {predicted_skin_type}")
-                st.write(skin_type_descriptions[predicted_skin_type])
-                st.write(skin_type_care[predicted_skin_type])
-        else:
-            st.write("Gambar belum diambil atau tidak ditemukan.")
-
-take_photo()
+process_camera_input()
