@@ -6,7 +6,7 @@ import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
 import av
 
 mtcnn = MTCNN()
@@ -46,7 +46,7 @@ skin_types = ["Berminyak", "Kering", "Normal", "Kombinasi"]
 skin_type_descriptions = {
     "Berminyak": "Kulitmu terdeteksi berminyak. Tipe kulit yang berminyak cenderung terlihat mengkilap dan licin akibat produksi minyak atau sebum berlebih pada wajah.",
     "Kering": "Kulitmu terdeteksi kering. Tipe kulit kering memiliki tingkat kelembapan yang rendah. Secara umum, orang yang memiliki tipe kulit kering kerap kali menghadapi masalah kulit, yakni mudah iritasi, sehingga rentan mengalami kemerahan dan jerawat.",
-    "Normal": "Kulitmu terdeteksi normal. Seseorang yang memiliki  kulit normal, tingkat sebum atau minyaknya dan tingkat hidrasi pada kulitnya seimbang, sehingga kulit tipe ini tidak terlalu kering dan tidak berminyak.",
+    "Normal": "Kulitmu terdeteksi normal. Seseorang yang memiliki kulit normal, tingkat sebum atau minyaknya dan tingkat hidrasi pada kulitnya seimbang, sehingga kulit tipe ini tidak terlalu kering dan tidak berminyak.",
     "Kombinasi": "Kulitmu terdeteksi kombinasi. Jenis kulit kombinasi merupakan perpaduan antara kulit berminyak dengan kulit kering. Seseorang dengan jenis kulit kombinasi memiliki kulit berminyak di area T-zone, yakni area dahu, hidung, dan dagu, serta kulit kering di area pipi."
 }
 skin_type_care = {
@@ -86,7 +86,16 @@ class VideoTransformer(VideoTransformerBase):
         return img
 
 def take_photo():
-    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
+    webrtc_ctx = webrtc_streamer(
+        key="example",
+        video_transformer_factory=VideoTransformer,
+        media_stream_constraints={"video": True, "audio": False},
+        client_settings=ClientSettings(
+            rtc_configuration={
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            }
+        )
+    )
     st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
     
     if st.button('📸 Ambil Foto'):
@@ -119,5 +128,7 @@ def take_photo():
                 st.write(f"Jenis Kulit yang Terdeteksi: {predicted_skin_type}")
                 st.write(skin_type_descriptions[predicted_skin_type])
                 st.write(skin_type_care[predicted_skin_type])
+        else:
+            st.write("Gambar belum diambil atau tidak ditemukan.")
 
 take_photo()
