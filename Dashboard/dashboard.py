@@ -4,7 +4,6 @@ import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
-import cv2
 
 # Initialize MTCNN for face detection
 mtcnn = MTCNN()
