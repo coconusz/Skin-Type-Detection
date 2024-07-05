@@ -1,13 +1,13 @@
 import streamlit as st
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 import av
-import cv2
-import os
 
 mtcnn = MTCNN()
 
@@ -30,16 +30,11 @@ class CustomResNet(nn.Module):
         return self.model(x)
 
 model = CustomResNet(num_classes=4)
-
-model_path = 'Dashboard/skintypes-model.pth'
-if os.path.exists(model_path):
-    try:
-        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')), strict=False)
-        model.eval()
-    except (EOFError, RuntimeError) as e:
-        st.error(f"Error loading the model: {e}")
-else:
-    st.error(f"Model file not found at {model_path}")
+try:
+    model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')), strict=False)
+    model.eval()
+except RuntimeError as e:
+    st.error(f"Error loading the model: {e}")
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -91,16 +86,7 @@ class VideoTransformer(VideoTransformerBase):
         return img
 
 def take_photo():
-    webrtc_ctx = webrtc_streamer(
-        key="example",
-        video_transformer_factory=VideoTransformer,
-        media_stream_constraints={"video": True, "audio": False},
-        client_settings=ClientSettings(
-            rtc_configuration={
-                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            }
-        )
-    )
+    webrtc_ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
     st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
     
     if st.button('📸 Ambil Foto'):
@@ -133,7 +119,5 @@ def take_photo():
                 st.write(f"Jenis Kulit yang Terdeteksi: {predicted_skin_type}")
                 st.write(skin_type_descriptions[predicted_skin_type])
                 st.write(skin_type_care[predicted_skin_type])
-        else:
-            st.write("Gambar belum diambil atau tidak ditemukan.")
 
 take_photo()
