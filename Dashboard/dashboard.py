@@ -6,8 +6,6 @@ import torch.nn as nn
 from facenet_pytorch import MTCNN
 from torchvision import transforms, models
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, ClientSettings
-import av
 
 mtcnn = MTCNN()
 
@@ -76,47 +74,31 @@ st.set_option('deprecation.showfileUploaderEncoding', False)
 st.title("✨Skin Type Detection✨")
 st.write("Kenali Tipe Wajahmu dengan Kamera!")
 
-class VideoTransformer(VideoTransformerBase):
-    def __init__(self):
-        self.result_img = None
-
-    def transform(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        self.result_img = img
-        return img
-
-def take_photo():
-    webrtc_ctx = webrtc_streamer(
-        key="example",
-        video_transformer_factory=VideoTransformer,
-        media_stream_constraints={"video": True, "audio": False},
-        client_settings=ClientSettings(
-            rtc_configuration={
-                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            }
-        )
-    )
+def main():
+    cap = cv2.VideoCapture(0)
     st.write("Klik tombol START kemudian posisikan wajahmu pada kamera dan klik tombol di bawah untuk mengambil gambar.")
     
+    stframe = st.empty()
+    
     if st.button('📸 Ambil Foto'):
-        if webrtc_ctx.video_transformer and webrtc_ctx.video_transformer.result_img is not None:
-            captured_img = webrtc_ctx.video_transformer.result_img
-            st.image(captured_img, use_column_width=True)
-            st.write("")
+        ret, frame = cap.read()
+        if ret:
+            cap.release()
+            stframe.image(frame, channels="BGR", use_column_width=True)
             st.write("Processing...")
 
-            captured_img_rgb = cv2.cvtColor(captured_img, cv2.COLOR_BGR2RGB)
+            captured_img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             face_image_pil = Image.fromarray(captured_img_rgb)
         
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            gray = cv2.cvtColor(captured_img, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = face_cascade.detectMultiScale(gray, 1.1, 4)
     
             if len(faces) == 0:
                 st.write("Wajah tidak terdeteksi! Silahkan ambil gambar kembali.")
             else:
                 x, y, w, h = faces[0]
-                face_image = captured_img[y:y+h, x:x+w]
+                face_image = frame[y:y+h, x:x+w]
                 face_image_pil = Image.fromarray(cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB))
 
                 processed_image = preprocess_image(face_image_pil)
@@ -131,4 +113,16 @@ def take_photo():
         else:
             st.write("Gambar belum diambil atau tidak ditemukan.")
 
-take_photo()
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        stframe.image(frame, channels="BGR", use_column_width=True)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
