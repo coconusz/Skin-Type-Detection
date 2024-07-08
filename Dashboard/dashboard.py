@@ -72,6 +72,10 @@ st.markdown("""
             color: #B4AFAE;
             text-align: center;
         }
+        .type {
+            font-size: 17px;
+            color: #ffffff;
+        }
         .result {
             font-size: 17px;
             color: #ffffff;
@@ -104,7 +108,8 @@ def take_photo():
                 processed_image = preprocess_image(face_image_np)
                 predicted_skin_type = classify_image(processed_image)
 
-                st.image(face_image, caption=f"Jenis Kulit Wajah: {predicted_skin_type}", use_column_width=True)
+                st.image(face_image, use_column_width=True)
+                st.markdown(f'**<p class="type">Jenis Kulit Wajah: {predicted_skin_type}</p>**', unsafe_allow_html=True)
                 st.markdown(f'<p class="result">{skin_type_descriptions[predicted_skin_type]}</p>', unsafe_allow_html=True)
                 st.markdown(f'<p class="care">{skin_type_care[predicted_skin_type]}</p>', unsafe_allow_html=True)
         else:
