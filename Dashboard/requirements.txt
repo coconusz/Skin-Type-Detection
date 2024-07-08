@@ -1,9 +1,6 @@
-av==12.1.0
-opencv-python==4.10.0.82
-opencv-python-headless==4.10.0.82
-pillow==10.2.0
+streamlit==1.31.1
 torch==2.2.2
 torchvision==0.17.2
+pillow==10.2.0
 facenet-pytorch==2.6.0
-streamlit==1.31.1
-streamlit-webrtc==0.47.7
+numpy==1.26.4
