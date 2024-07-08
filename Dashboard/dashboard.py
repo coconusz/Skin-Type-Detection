@@ -15,7 +15,7 @@ def load_model():
     num_ftrs = model.fc.in_features
     model.fc = torch.nn.Linear(num_ftrs, len(skin_types))  
 
-    state_dict = torch.load('C:\\Documents\\COLLEGE\\PI\\Implementasi Algoritma Convolutional Neural Network (CNN) Untuk Sistem Identifikasi Jenis Kulit Wajah\\Dashboard\\skintypes-model.pth', map_location=torch.device('cpu'))
+    state_dict = torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu'))
     state_dict = {k: v for k, v in state_dict.items() if not k.startswith('fc')}
     model.load_state_dict(state_dict, strict=False)
 
