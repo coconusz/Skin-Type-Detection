@@ -1,47 +1,38 @@
-import cv2
 import streamlit as st
 import torch
-import torch.nn as nn
-from facenet_pytorch import MTCNN
-from torchvision import transforms, models
+from torchvision import transforms
+from torchvision.models import resnet50, ResNet50_Weights
 from PIL import Image
+from facenet_pytorch import MTCNN
+import numpy as np
 
-# Initialize MTCNN for face detection
 mtcnn = MTCNN()
 
-# Define the CustomResNet model
-class CustomResNet(nn.Module):
-    def __init__(self, num_classes=4):
-        super(CustomResNet, self).__init__()
-        self.model = models.resnet18(pretrained=False)
-        self.model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.model.layer1[0].conv1 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.model.layer1[1].conv1 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.model.layer2[0].conv1 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False)
-        self.model.layer2[1].conv1 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False)
-        self.model.layer3[0].conv1 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1, bias=False)
-        self.model.layer3[1].conv1 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False)
-        self.model.layer4[0].conv1 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1, bias=False)
-        self.model.layer4[1].conv1 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False)
-        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+skin_types = ["Berminyak", "Kering", "Normal", "Kombinasi"]
 
-    def forward(self, x):
-        return self.model(x)
+def load_model():
+    model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+    num_ftrs = model.fc.in_features
+    model.fc = torch.nn.Linear(num_ftrs, len(skin_types))  
 
-# Load the pre-trained model
-model = CustomResNet(num_classes=4)
-model.load_state_dict(torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu')))
-model.eval()
+    state_dict = torch.load('C:\\Documents\\COLLEGE\\PI\\Implementasi Algoritma Convolutional Neural Network (CNN) Untuk Sistem Identifikasi Jenis Kulit Wajah\\Dashboard\\skintypes-model.pth', map_location=torch.device('cpu'))
+    state_dict = {k: v for k, v in state_dict.items() if not k.startswith('fc')}
+    model.load_state_dict(state_dict, strict=False)
 
-# Define the image transformation
+    model.fc.weight.data = torch.nn.init.xavier_uniform_(model.fc.weight.data)
+    model.fc.bias.data.fill_(0)
+
+    model.eval()
+    return model
+
+model = load_model()
+
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-# Skin types and their descriptions
-skin_types = ["Berminyak", "Kering", "Normal", "Kombinasi"]
 skin_type_descriptions = {
     "Berminyak": "Kulitmu terdeteksi berminyak. Tipe kulit yang berminyak cenderung terlihat mengkilap dan licin akibat produksi minyak atau sebum berlebih pada wajah.",
     "Kering": "Kulitmu terdeteksi kering. Tipe kulit kering memiliki tingkat kelembapan yang rendah. Secara umum, orang yang memiliki tipe kulit kering kerap kali menghadapi masalah kulit, yakni mudah iritasi, sehingga rentan mengalami kemerahan dan jerawat.",
@@ -55,13 +46,13 @@ skin_type_care = {
     "Kombinasi": "Saran Perawatan: Bersihkan wajah 2 kali sehari secara rutin. Hindari penggunaan produk pembersih yang mengandung alkohol, asam salisilat, dan benzoil peroksida. Selain itu, kamu juga bisa menggunakan produk pembersih untuk kulit wajah kering di area pipi dan produk khusus kulit berminyak untuk area T-zone."
 }
 
-# Preprocess the image
 def preprocess_image(image):
+    image = Image.fromarray(image)
+
     image = transform(image)
     image = image.unsqueeze(0)
     return image
 
-# Classify the image using the model
 def classify_image(image):
     with torch.no_grad():
         output = model(image)
@@ -69,36 +60,54 @@ def classify_image(image):
         predicted_skin_type = skin_types[predicted.item()]
     return predicted_skin_type
 
-# Streamlit app
-st.title("✨Skin Type Detection✨")
-st.write("Kenali Tipe Wajahmu!")
+st.markdown("""
+    <style>
+        .title {
+            font-size: 55px;
+            color: #ffffff;
+            text-align: center;
+        }
+        .description {
+            font-size: 15px;
+            color: #B4AFAE;
+            text-align: center;
+        }
+        .result {
+            font-size: 17px;
+            color: #ffffff;
+        }
+        .care {
+            font-size: 17px;
+            color: #ffffff;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# Function to process camera input
-def process_camera_input():
-    video_stream = st.camera_input()
-    while video_stream.is_active:
-        frame = video_stream.read()
-        if frame is not None:
-            # Convert frame to PIL Image
-            frame_pil = Image.fromarray(frame)
+st.set_option('deprecation.showfileUploaderEncoding', False)
+st.markdown('<h1 class="title">✨Skin Type Detection✨</h1>', unsafe_allow_html=True)
+st.markdown('<p class="description">Klik tombol dibawah untuk mengambil gambar dan sistem akan mendeteksi jenis kulit wajahmu!</p>', unsafe_allow_html=True)
 
-            # Detect faces
-            boxes, _ = mtcnn.detect(frame_pil)
+def take_photo():
+    video_stream = st.camera_input("")
+    if video_stream is not None:
+        frame = np.array(Image.open(video_stream))
 
-            # Display only the face if detected
-            if boxes is not None:
-                for box in boxes:
-                    x, y, w, h = [int(coord) for coord in box]
-                    face_image = frame[y:y+h, x:x+w]
-                    face_image_pil = Image.fromarray(face_image)
-                    
-                    # Preprocess and classify the face image
-                    processed_image = preprocess_image(face_image_pil)
-                    predicted_skin_type = classify_image(processed_image)
+        boxes, _ = mtcnn.detect(frame)
+        
+        if boxes is not None:
+            for box in boxes:
+                x, y, w, h = [int(coord) for coord in box]
+                face_image = frame[y:y+h, x:x+w]
+                
+                face_image_np = np.array(face_image)
 
-                    # Display results
-                    st.image(face_image, caption=f"Jenis Kulit: {predicted_skin_type}", use_column_width=True)
-                    st.write(skin_type_descriptions[predicted_skin_type])
-                    st.write(skin_type_care[predicted_skin_type])  
+                processed_image = preprocess_image(face_image_np)
+                predicted_skin_type = classify_image(processed_image)
 
-process_camera_input()
+                st.image(face_image, caption=f"Jenis Kulit Wajah: {predicted_skin_type}", use_column_width=True)
+                st.markdown(f'<p class="result">{skin_type_descriptions[predicted_skin_type]}</p>', unsafe_allow_html=True)
+                st.markdown(f'<p class="care">{skin_type_care[predicted_skin_type]}</p>', unsafe_allow_html=True)
+        else:
+            st.markdown('<p class="description">Wajah tidak terdeteksi. Silahkan ambil gambar lagi.</p>', unsafe_allow_html=True)
+
+take_photo()
