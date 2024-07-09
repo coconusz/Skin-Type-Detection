@@ -138,7 +138,7 @@ if menu == "Home":
 elif menu == "Info":
     st.markdown('<h1 class="title">✨Tipe Kulit Wajah✨</h1>', unsafe_allow_html=True)
     selected_skin_type = st.selectbox("Pilih tipe kulit wajah dibawah untuk melihat informasi lebih lanjut:", skin_types)
-    image_path = f'images/{selected_skin_type}.jpg'
+    image_path = f'Dashboard/Images/{selected_skin_type}.jpg'
     st.image(image_path,  width=300)
     st.markdown(f'### {selected_skin_type}')
     st.markdown(f'<div style="text-align: justify;">{skin_type_info[selected_skin_type]}</div>', unsafe_allow_html=True)
