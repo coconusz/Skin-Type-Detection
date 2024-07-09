@@ -6,10 +6,8 @@ from PIL import Image
 from facenet_pytorch import MTCNN
 import numpy as np
 
-# Initialize the face detector
 mtcnn = MTCNN()
 
-# Define skin types and descriptions
 skin_types = ["Berminyak", "Kering", "Normal", "Kombinasi"]
 
 def load_model():
@@ -17,12 +15,10 @@ def load_model():
     num_ftrs = model.fc.in_features
     model.fc = torch.nn.Linear(num_ftrs, len(skin_types))  
 
-    # Load the state dictionary, ignoring the fc layer
     state_dict = torch.load('Dashboard/skintypes-model.pth', map_location=torch.device('cpu'))
     state_dict = {k: v for k, v in state_dict.items() if not k.startswith('fc')}
     model.load_state_dict(state_dict, strict=False)
 
-    # Manually initialize the fc layer weights
     model.fc.weight.data = torch.nn.init.xavier_uniform_(model.fc.weight.data)
     model.fc.bias.data.fill_(0)
 
@@ -31,7 +27,6 @@ def load_model():
 
 model = load_model()
 
-# Transformasi gambar
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
